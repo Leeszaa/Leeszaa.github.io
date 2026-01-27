@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Weazel Deal der Woche Generator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #0a0a0a;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+        h1 { margin-top: 0; color: #c92b2b; text-transform: uppercase; letter-spacing: 2px; }
+        
+        .main-layout {
+            display: flex;
+            flex: 1;
+            gap: 20px;
+            overflow: hidden;
+        }
+
+        /* Controls */
+        .editor-panel {
+            width: 450px;
+            background-color: #161616;
+            padding: 20px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .section-title {
+            color: #c92b2b;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+            text-transform: uppercase;
+        }
+
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; color: #888; font-size: 0.9em; }
+        input, select, textarea {
+            width: 100%;
+            background-color: #222;
+            border: 1px solid #444;
+            color: #fff;
+            padding: 8px;
+            border-radius: 4px;
+            font-family: inherit;
+            box-sizing: border-box;
+        }
+        textarea { resize: vertical; min-height: 80px; }
+        input:focus, select:focus, textarea:focus { border-color: #c92b2b; outline: none; }
+
+        .btn {
+            background-color: #c92b2b;
+            color: #fff;
+            border: none;
+            padding: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            width: 100%;
+            margin-top: 10px;
+        }
+        .btn:hover { background-color: #a01b1b; }
+        .btn-secondary { background-color: #333; margin-top: 10px; }
+        .btn-secondary:hover { background-color: #444; }
+        .btn-del { 
+            background: none; border: none; color: #666; cursor: pointer; float:right;
+        }
+        .btn-del:hover { color: #f55; }
+
+        /* Accordion / List Box */
+        .company-box {
+            background-color: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 15px;
+        }
+        .offer-box {
+            background-color: #252525;
+            border-left: 2px solid #555;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        /* Preview */
+        .preview-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow: hidden;
+        }
+        .preview-window {
+            flex: 1;
+            background-color: #121212;
+            border: 1px dashed #333;
+            overflow-y: auto;
+        }
+        .output-area {
+            height: 150px;
+            background-color: #000;
+            border: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+        }
+        .output-code {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #a9b7c6;
+            font-family: 'Consolas', monospace;
+            font-size: 0.85em;
+            padding: 10px;
+            resize: none;
+        }
+        .output-controls {
+            padding: 5px;
+            text-align: right;
+            border-top: 1px solid #333;
+            background-color: #111;
+        }
+
+        /* Helpers */
+        .flex-row { display: flex; gap: 10px; }
+        .flex-1 { flex: 1; }
+    </style>
+</head>
+<body>
+
+    <header style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+        <h1>Deal der Woche Generator</h1>
+        <a href="index.html" style="color:#888; text-decoration:none; font-size:0.9em; border:1px solid #333; padding:5px 10px; border-radius:4px;">&larr; Zurück</a>
+    </header>
+
+    <div class="main-layout">
+        <div class="editor-panel">
+            
+            <div class="section-title">Highlight Deal</div>
+            <div class="form-group">
+                <label>Unternehmen</label>
+                <input type="text" id="hlCompany" placeholder="z.B. Dillys Car Dealership" oninput="updatePreview()">
+            </div>
+            <div class="form-group">
+                <label>Titel</label>
+                <input type="text" id="hlTitle" placeholder="z.B. ⭐ Dillys Deal der Woche - Der Coil Voltic! ⭐" oninput="updatePreview()">
+            </div>
+            <div class="form-group">
+                <label>Info Text (Oben)</label>
+                <textarea id="hlIntro" placeholder="Kurze Einleitung, Preis, Zeitraum..." oninput="updatePreview()"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Details (Liste/Beschreibung)</label>
+                <textarea id="hlDesc" placeholder="• Details..." oninput="updatePreview()" style="height:120px;"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Bild URL</label>
+                <input type="text" id="hlImg" placeholder="https://..." oninput="updatePreview()">
+            </div>
+             <div class="form-group">
+                <label>Kontakt / Footer</label>
+                <input type="text" id="hlFooter" placeholder="Ruf an unter..." oninput="updatePreview()">
+            </div>
+
+            <div class="section-title">Weitere Angebote</div>
+            
+            <div id="companyList"></div>
+
+            <button class="btn btn-secondary" onclick="addCompany()">+ Unternehmen hinzufügen</button>
+
+        </div>
+
+        <div class="preview-panel">
+            <div class="preview-window">
+                <div id="previewContent"></div>
+            </div>
+
+            <div class="output-area">
+                <textarea id="outputCode" class="output-code" readonly></textarea>
+                <div class="output-controls">
+                    <button class="btn" style="width:auto; padding:5px 15px; font-size:0.9em; margin:0;" onclick="copyCode()">Code Kopieren</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        const companies = []; // { name: '', offers: [ {title, desc, img} ] }
+
+        // Initial Data for Highlight
+        // (Just empty or placeholders, managed by DOM inputs directly for highlight since it's static structure)
+
+        function addCompany() {
+            companies.push({ name: '', offers: [] });
+            renderEditor();
+            updatePreview();
+        }
+
+        function removeCompany(idx) {
+            companies.splice(idx, 1);
+            renderEditor();
+            updatePreview();
+        }
+
+        function addOffer(compIdx) {
+            if(companies[compIdx].offers.length >= 3) {
+                alert("Maximal 3 Angebote pro Unternehmen/Reihe.");
+                return;
+            }
+            companies[compIdx].offers.push({ title: '', desc: '', img: '' });
+            renderEditor();
+            updatePreview();
+        }
+
+        function removeOffer(compIdx, offIdx) {
+            companies[compIdx].offers.splice(offIdx, 1);
+            renderEditor();
+            updatePreview();
+        }
+
+        function updateCompanyField(idx, field, val) {
+            companies[idx][field] = val;
+            updatePreview();
+        }
+
+        function updateOfferField(compIdx, offIdx, field, val) {
+            companies[compIdx].offers[offIdx][field] = val;
+            updatePreview();
+        }
+
+        function renderEditor() {
+            const container = document.getElementById('companyList');
+            container.innerHTML = '';
+
+            companies.forEach((comp, cIdx) => {
+                const cDiv = document.createElement('div');
+                cDiv.className = 'company-box';
+                
+                let offersHtml = '';
+                comp.offers.forEach((off, oIdx) => {
+                    offersHtml += `
+                    <div class="offer-box">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                            <span style="font-size:0.8em; color:#888;">Angebot #${oIdx+1}</span>
+                            <button class="btn-del" onclick="removeOffer(${cIdx}, ${oIdx})">x</button>
+                        </div>
+                        <input type="text" class="form-group" style="margin-bottom:5px;" placeholder="Titel" value="${off.title}" oninput="updateOfferField(${cIdx}, ${oIdx}, 'title', this.value)">
+                        <textarea class="form-group" style="margin-bottom:5px; height:60px; min-height:60px;" placeholder="Beschreibung" oninput="updateOfferField(${cIdx}, ${oIdx}, 'desc', this.value)">${off.desc}</textarea>
+                        <input type="text" placeholder="Bild URL (Optional)" value="${off.img}" oninput="updateOfferField(${cIdx}, ${oIdx}, 'img', this.value)">
+                    </div>
+                    `;
+                });
+
+                const addBtn = comp.offers.length < 3 
+                    ? `<button class="btn btn-secondary" style="margin-top:5px; font-size:0.8em;" onclick="addOffer(${cIdx})">+ Angebot</button>`
+                    : '';
+
+                cDiv.innerHTML = `
+                    <div class="form-group">
+                        <label style="display:flex; justify-content:space-between;">
+                            Name des Unternehmens
+                            <button class="btn-del" onclick="removeCompany(${cIdx})">Löschen</button>
+                        </label>
+                        <input type="text" value="${comp.name}" placeholder="Name" oninput="updateCompanyField(${cIdx}, 'name', this.value)">
+                    </div>
+                    <div>${offersHtml}</div>
+                    ${addBtn}
+                `;
+                container.appendChild(cDiv);
+            });
+        }
+
+        function updatePreview() {
+            // Highlight Data
+            const hlCompany = document.getElementById('hlCompany').value || "Muster Firma";
+            const hlTitle = document.getElementById('hlTitle').value || "Mega Deal";
+            const hlIntro = document.getElementById('hlIntro').value;
+            const hlDesc = document.getElementById('hlDesc').value;
+            const hlImg = document.getElementById('hlImg').value;
+            const hlFooter = document.getElementById('hlFooter').value;
+
+            // Generate Highlight HTML
+            const hlIntroHtml = hlIntro ? hlIntro.replace(/\n/g, '<br>') : '';
+            const hlDescHtml = hlDesc ? hlDesc.replace(/\n/g, '<br>') : '';
+            
+            const hlImgHtml = hlImg ? `<img alt="Car Deal" src="${hlImg}" style="border-radius:8px; filter:brightness(0.95) contrast(1.02); margin-bottom:10px; width:100%" />` : '';
+
+            const highlightSection = `
+            <!-- Highlight: ${hlCompany} -->
+            <div style="border:2px solid rgba(179,0,0,0.25); border-radius:12px; padding:20px; margin:30px 0; background:#1a0f12; box-shadow:0 4px 12px rgba(0,0,0,0.6);">
+                <div style="margin:0 0 15px 0; color:#e6eef6; font-size:1.625em; font-weight:700; text-align:center; border-bottom:1px solid rgba(179,0,0,0.2); padding-bottom:10px;">${hlCompany}</div>
+
+                <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:stretch;">
+                    <div style="flex:1; border:3px solid rgba(179,0,0,0.4); border-radius:12px; padding:15px; background:#0f1418; display:flex; flex-direction:column; box-shadow:0 4px 10px rgba(0,0,0,0.6);">
+                        <div style="margin:0 0 15px 0; color:#ffd7d7; font-size:1.4em; font-weight:700; text-align:center; text-shadow:0 0 10px rgba(179,0,0,0.4);">${hlTitle}</div>
+                        ${hlImgHtml}
+                        
+                        <div style="font-size: 1.1em; font-weight: bold; color:#e0e0e0; margin-bottom:15px; line-height:1.5;">
+                            ${hlIntroHtml}
+                        </div>
+
+                        <div style="color:#ccc; line-height:1.6; margin-bottom:15px;">
+                            ${hlDescHtml}
+                        </div>
+
+                        <div style="margin-top:auto; padding-top:15px; border-top:1px dashed rgba(179,0,0,0.3); text-align:center; color:#fff; font-weight:bold;">
+                           ${hlFooter}
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+
+            // Generate Companies HTML
+            let companiesHtml = '';
+            companies.forEach(comp => {
+                let offersHtml = '';
+                comp.offers.forEach(off => {
+                    const img = off.img ? `<img src="${off.img}" style="width:100%; border-radius:6px; margin-bottom:10px;">` : '';
+                    offersHtml += `
+                    <!-- Offer -->
+                    <div style="flex:1; min-width:250px; border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:15px; background:#0f1418; display:flex; flex-direction:column;">
+                        <div style="margin:0 0 10px 0; font-size:1.125em; color:#e6eef6; font-weight:700; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:5px;">${off.title}</div>
+                        ${img}
+                        <div style="color:#ccc; font-size:0.95em; line-height:1.5;">
+                            ${off.desc.replace(/\n/g, '<br>')}
+                        </div>
+                    </div>`;
+                });
+
+                companiesHtml += `
+                <div style="border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:20px; margin:30px 0; background:#121619; box-shadow:0 2px 6px rgba(0,0,0,0.6);">
+                    <div style="margin:0 0 15px 0; color:#e6eef6; font-size:1.5em; font-weight:700; border-left:4px solid #c92b2b; padding-left:15px;">${comp.name}</div>
+                    
+                    <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:stretch;">
+                        ${offersHtml}
+                    </div>
+                </div>`;
+            });
+
+
+            // Final Assembly with Wrapper
+            const date = new Date().toLocaleDateString('de-DE'); // Dynamic date or static? template didn't specify.
+
+            const fullHtml = `<!-- GRUNDGERÜST (WRAPPER) -->
+<div style="position: relative; width: 100%; max-width: 1190px; box-sizing: border-box; margin:0 auto; padding:0; font-family:'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color:#121212; color:#e0e0e0; -webkit-font-smoothing: antialiased;">
+
+  <!-- HAUPT-CONTAINER -->
+  <div style="width:90%; max-width:1100px; margin:40px auto;">
+
+    <!-- HEADER TITLE -->
+    <div style="text-align:center; color:#ff6b6b; margin:0 0 40px 0; font-size:2.5em; font-weight:700; text-transform:uppercase; letter-spacing:2px; text-shadow: 0 0 20px rgba(255, 107, 107, 0.2);">
+        Deal der Woche
+    </div>
+
+    ${highlightSection}
+
+    ${companiesHtml}
+
+    <div style="text-align:center; margin-top:50px; padding:20px; border:1px dashed #333; color:#888; border-radius:8px;">
+        Dein Deal der Woche soll hier auch erscheinen? Ruf uns gerne an unter 444222 oder lass uns eine Venture Mail an Weazel News zukommen.
+    </div>
+
+  </div> <!-- END HAUPT-CONTAINER -->
+
+  <!-- FOOTER -->
+  <div style="width:100%; padding:30px 0; background-color:#161616; border-top:1px solid #333; text-align:center; color:#666; font-size:0.9em; margin-top:60px;">
+    <p style="margin:0 0 10px 0;">© 2026 Weazel News. Alle Rechte vorbehalten.</p>
+    <div style="margin-top:10px;">
+      <span style="margin:0 10px; cursor:pointer; color:#888;">Sie haben Fragen, Anregungen oder Kritik an unser Weazel News Team? Melden Sie sich gerne bei uns unter unserer Hotline 444 222 oder per VentureMail direkt an Weazel News.</span>
+    </div>
+  </div>
+
+</div> <!-- END WRAPPER -->`;
+
+            document.getElementById('previewContent').innerHTML = fullHtml;
+            document.getElementById('outputCode').value = fullHtml;
+        }
+
+        function copyCode() {
+            const copyText = document.getElementById("outputCode");
+            copyText.select();
+            document.execCommand("copy");
+        }
+
+        // Init
+        // Add one empty company slot? Or keep header free. 
+        // Let's keep Highlight by default and preview it.
+        updatePreview();
+    </script>
+</body>
+</html>

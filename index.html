@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weazel Tools</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #0a0a0a;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        h1 {
+            color: #c92b2b;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 2.5rem;
+            margin-bottom: 40px;
+        }
+        .card-container {
+            display: flex;
+            gap: 30px;
+        }
+        .card {
+            background-color: #161616;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 30px;
+            width: 250px;
+            text-align: center;
+            transition: transform 0.2s, border-color 0.2s;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: #c92b2b;
+        }
+        .card h2 {
+            margin-top: 0;
+            color: #fff;
+        }
+        .card p {
+            color: #888;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+        .icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            display: block;
+        }
+        footer {
+            margin-top: 50px;
+            font-size: 0.9em;
+            color: #666;
+        }
+        footer a {
+            color: #888;
+            text-decoration: none;
+        }
+        footer a:hover {
+            color: #c92b2b;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Weazel News Tools</h1>
+
+    <div class="card-container">
+        <a href="kleinanzeigen_generator.html" class="card">
+            <span class="icon">📰</span>
+            <h2>Kleinanzeigen</h2>
+            <p>Zur Erstellung von Kleinanzeigen.</p>
+        </a>
+
+        <a href="wetter_erstellen.html" class="card">
+            <span class="icon">☀️</span>
+            <h2>Wetter</h2>
+            <p>Generator für das Wetter.</p>
+        </a>
+
+        <a href="eventkalender.html" class="card">
+            <span class="icon">📅</span>
+            <h2>Events</h2>
+            <p>Generator für Eventkalender.</p>
+        </a>
+
+        <a href="deal_generator.html" class="card">
+            <span class="icon">🏷️</span>
+            <h2>Deal der Woche</h2>
+            <p>Generator für den Deal der Woche.</p>
+        </a>
+    </div>
+
+</body>
+</html>
