@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weazel Tools</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #0a0a0a;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        h1 {
+            color: #c92b2b;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 2.5rem;
+            margin-bottom: 40px;
+        }
+        .card-container {
+            display: flex;
+            gap: 30px;
+        }
+        .card {
+            background-color: #161616;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 30px;
+            width: 250px;
+            text-align: center;
+            transition: transform 0.2s, border-color 0.2s;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: #c92b2b;
+        }
+        .card h2 {
+            margin-top: 0;
+            color: #fff;
+        }
+        .card p {
+            color: #888;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+        .icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Weazel News Tools</h1>
+
+    <div class="card-container">
+        <a href="kleinanzeigen_generator.html" class="card">
+            <span class="icon">📰</span>
+            <h2>Kleinanzeigen</h2>
+            <p>Erstelle professionelle Kleinanzeigen für Weazel News mit Preisen, Bildern und verschiedenen Layouts.</p>
+        </a>
+
+        <a href="wetter_erstellen.html" class="card">
+            <span class="icon">☀️</span>
+            <h2>Wetter</h2>
+            <p>Generiere die wöchentliche Wettervorhersage Grafik als Bild für Artikel oder Social Media.</p>
+        </a>
+    </div>
+
+</body>
+</html>
