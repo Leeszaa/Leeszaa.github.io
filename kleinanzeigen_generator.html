@@ -239,11 +239,11 @@
             
             try {
                 const [c, oi, ot, si, st] = await Promise.all([
-                    fetch('Module/kleinanzeigen_container.html').then(r => r.text()),
-                    fetch('Module/kleinanzeigen_angebot_bild.html').then(r => r.text()),
-                    fetch('Module/kleinanzeigen_angebot_text.html').then(r => r.text()),
-                    fetch('Module/kleinanzeigen_gesucht_bild.html').then(r => r.text()),
-                    fetch('Module/kleinanzeigen_gesucht_text.html').then(r => r.text())
+                    fetch('Modules/kleinanzeigen_container.html').then(r => r.text()),
+                    fetch('Modules/kleinanzeigen_angebot_bild.html').then(r => r.text()),
+                    fetch('Modules/kleinanzeigen_angebot_text.html').then(r => r.text()),
+                    fetch('Modules/kleinanzeigen_gesucht_bild.html').then(r => r.text()),
+                    fetch('Modules/kleinanzeigen_gesucht_text.html').then(r => r.text())
                 ]);
 
                 templates.container = c;
