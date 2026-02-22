@@ -37,6 +37,16 @@
             flex-shrink: 0;
         }
         
+        .section-title {
+            color: #c92b2b;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+            text-transform: uppercase;
+        }
+
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; color: #888; font-size: 0.9em; }
         input, select, textarea {
@@ -141,9 +151,35 @@
             border-top: 1px solid #333;
         }
 
+        /* Notification */
+        .notification {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            background-color: #222;
+            color: #fff;
+            padding: 15px 25px;
+            border-radius: 6px;
+            border-left: 5px solid #c92b2b;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        .notification.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        .notification.success { border-left-color: #2ecc71; }
+        .notification.error { border-left-color: #e74c3c; }
+
     </style>
 </head>
 <body>
+
+    <div id="toast" class="notification">Benachrichtigung</div>
 
     <header style="display:flex; justify-content:space-between; align-items:center;">
         <h1>Weazel Kleinanzeigen Generator</h1>
@@ -157,7 +193,14 @@
             <h3 style="margin-top:0; color:#ccc;">Neue Anzeige</h3>
             <div id="loadingStatus" style="color: yellow; margin-bottom: 10px; font-size: 0.9em; display: none;">Lade Module...</div>
 
+            <div class="section-title">Importieren</div>
+            <div class="form-group">
+                <label>Vorhandenen Code hier einfügen:</label>
+                <textarea id="importCodeInput" placeholder="<div style=...>...</div>" style="height:100px;"></textarea>
+                <button class="btn btn-secondary" onclick="importCode()">Daten laden</button>
+            </div>
             
+            <div class="section-title">Anzeigendetails</div>
             <div class="form-group">
                 <label>Typ</label>
                 <select id="adType">
@@ -388,6 +431,133 @@
             const original = btn.innerText;
             btn.innerText = "Kopiert!";
             setTimeout(() => btn.innerText = original, 2000);
+        }
+
+        function importCode() {
+            const input = document.getElementById('importCodeInput').value;
+            if(!input) return;
+
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(input, 'text/html');
+
+            const newAds = [];
+            
+            // Try to find ad cards based on the wrapper style in the user snippet
+            // The user snippet uses: style="flex:1 1 300px; ... display:flex; flex-direction:column;"
+            // We can search for all divs and filter them.
+            const allDivs = doc.querySelectorAll('div');
+            
+            allDivs.forEach(div => {
+                // Heuristic Check: Is this an ad card?
+                // Check 1: flex-basis 300px or min-width 250px (from older versions)
+                const style = div.getAttribute('style') || '';
+                if( (!style.includes('flex:1 1 300px') && !style.includes('flex: 1 1 300px')) && !style.includes('min-width:250px') ) {
+                    return; // Likely not a card
+                }
+
+                
+                // --- Extract Data ---
+                let type = 'angebot'; // Default
+                let title = '';
+                let price = '';
+                let desc = '';
+                let contact = '';
+                let image = '';
+
+                // 1. TYPE
+                // User snippet: <div style="background-color:#2e7d32 ...">Angebot</div>
+                // Check if there is a header badge
+                const badge = div.querySelector('div[style*="background-color:"]');
+                if(badge) {
+                    const badgeText = badge.textContent.trim().toLowerCase();
+                    if(badgeText.includes('angebot')) type = 'angebot';
+                    else if(badgeText.includes('gesucht')) type = 'gesucht';
+                }
+
+                // 2. TITLE
+                // User snippet: <div style="font-size:1.2em; font-weight:bold; ...">Title</div>
+                const titleEl = div.querySelector('div[style*="font-size:1.2em"], div[style*="font-size: 1.2em"]');
+                if(titleEl) title = titleEl.textContent.trim();
+                else {
+                    // Fallback for older templtes that used h1/h2
+                    const hHeader = div.querySelector('h1, h2');
+                    if(hHeader) {
+                        let t = hHeader.textContent.trim();
+                        // Remove prefixes like "Biete: "
+                        if(t.startsWith('Biete:')) t = t.substring(6).trim();
+                        if(t.startsWith('Suche:')) t = t.substring(6).trim();
+                        title = t;
+                    }
+                }
+
+                // 3. PRICE
+                // User snippet: <div>... Preis: <span ...>Value</span></div>
+                // We search for elements containing "Preis:" or "Budget:"
+                // OR we check the span inside.
+                const priceLabel = Array.from(div.querySelectorAll('div, span')).find(el => 
+                    el.textContent.includes('Preis:') || el.textContent.includes('Budget:') || el.textContent.includes('$')
+                );
+
+                if(priceLabel) {
+                    // The value might be in a child span or just text
+                    // User snippet: Preis: <span style="color:#ccc;">Deine Seele</span>
+                    // We can just get the text and clean it up.
+                    let raw = priceLabel.innerText; // "Preis: Deine Seele"
+                    raw = raw.replace(/Preis:\s*/i, '').replace(/Budget:\s*/i, '').trim();
+                    price = raw;
+                }
+
+                // 4. DESCRIPTION
+                // User snippet: <p ...> text </p>
+                const pTag = div.querySelector('p');
+                if(pTag) {
+                    desc = pTag.innerHTML.replace(/<br\s*\/?>/gi, '\n').trim();
+                }
+
+                // 5. CONTACT
+                // User snippet: <div style="border-top:1px solid #333 ..."> <strong>Kontakt:</strong> 112222 </div>
+                const contactDiv = div.querySelector('div[style*="border-top"]');
+                if(contactDiv) {
+                    let cText = contactDiv.innerText;
+                    cText = cText.replace(/Kontakt:\s*/i, '').trim();
+                    contact = cText;
+                } else {
+                    // Fallback: look for text "Kontakt" anywhere
+                    const anyContact = Array.from(div.querySelectorAll('div, p')).find(el => el.textContent.includes('Kontakt:') || el.textContent.includes('Melde dich bei'));
+                    if(anyContact) {
+                         let cText = anyContact.innerText;
+                         cText = cText.replace(/Kontakt:\s*/i, '').replace(/Melde dich bei\s*/i, '').trim();
+                         contact = cText;
+                    }
+                }
+
+                // 6. IMAGE
+                const imgEl = div.querySelector('img');
+                if(imgEl) image = imgEl.src;
+
+                // Validate
+                if(title) {
+                    newAds.push({ type, title, price, desc, contact, image });
+                }
+            });
+
+            if(newAds.length > 0) {
+                ads = newAds;
+                render();
+                showNotification(`${newAds.length} Anzeigen importiert.`, "success");
+            } else {
+                showNotification("Keine passenden Anzeigen gefunden. Format korrekt?", "error");
+            }
+        }
+
+        function showNotification(msg, type='info') {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.className = 'notification show ' + type;
+            
+            setTimeout(() => {
+                toast.className = 'notification';
+            }, 3000);
         }
 
         // Init

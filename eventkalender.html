@@ -37,6 +37,16 @@
             flex-shrink: 0;
         }
 
+        .section-title {
+            color: #c92b2b;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+            text-transform: uppercase;
+        }
+
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; color: #888; font-size: 0.9em; }
         input, select, textarea {
@@ -151,9 +161,35 @@
             border-top: 1px solid #333;
             background-color: #111;
         }
+
+        /* Notification */
+        .notification {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            background-color: #222;
+            color: #fff;
+            padding: 15px 25px;
+            border-radius: 6px;
+            border-left: 5px solid #c92b2b;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        .notification.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        .notification.success { border-left-color: #2ecc71; }
+        .notification.error { border-left-color: #e74c3c; }
     </style>
 </head>
 <body>
+
+    <div id="toast" class="notification">Benachrichtigung</div>
 
     <header style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
         <h1>Eventkalender Generator</h1>
@@ -162,6 +198,14 @@
 
     <div class="main-layout">
         <div class="editor-panel">
+            <div class="section-title">Importieren</div>
+            <div class="form-group">
+                <label>Vorhandenen Code hier einfügen:</label>
+                <textarea id="importCodeInput" placeholder="<div style=...>...</div>" style="height:100px;"></textarea>
+                <button class="btn btn-secondary" onclick="importCode()">Daten laden</button>
+            </div>
+
+            <div class="section-title">Event-Woche</div>
             <div class="form-group">
                 <label>Woche startet am (Montag):</label>
                 <input type="date" id="startDate" onchange="updateDates()">
@@ -491,6 +535,186 @@
             const copyText = document.getElementById("outputCode");
             copyText.select();
             document.execCommand("copy");
+        }
+
+        function importCode() {
+            const code = document.getElementById('importCodeInput').value;
+            if (!code) return;
+
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(code, 'text/html');
+
+            // Reset current events
+            for(let i=0; i<7; i++) events[i] = [];
+
+            // Helper to clean text
+            const clean = (str) => str ? str.replace(/\s+/g, ' ').trim() : '';
+
+            // 1. Detect Start Date (Global Check)
+            // Search systematically for any date format DD.MM.YYYY
+            const allText = doc.body.textContent;
+            const dateMatch = allText.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+            if(dateMatch) {
+                // Determine if this is start of week or random date.
+                // We'll trust the first date found usually, or find "Montag, ..."
+                // Let's try to find Montag explicitly
+                const mondayMatch = allText.match(/Montag.*?(\d{2})\.(\d{2})\.(\d{4})/);
+                if(mondayMatch) {
+                     const d = new Date(`${mondayMatch[3]}-${mondayMatch[2]}-${mondayMatch[1]}`);
+                     if(!isNaN(d)) {
+                        currentWeekStart = d;
+                        document.getElementById('startDate').valueAsDate = d;
+                     }
+                } else {
+                     // Fallback to first date found
+                     const d = new Date(`${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`);
+                     if(!isNaN(d)) {
+                         // Attempt to reset to Monday if this date is not Monday
+                         const day = d.getDay() || 7; // 1=Mon, 7=Sun
+                         d.setDate(d.getDate() - (day - 1));
+                         currentWeekStart = d;
+                         document.getElementById('startDate').valueAsDate = d;
+                     }
+                }
+            }
+
+            // 2. Find Day Columns
+            // We look for the columns based on the day names.
+            // Strategy: Find an element containing "Montag", walk up to find the container column.
+            const dayKeywords = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+            
+            dayKeywords.forEach((dayName, index) => {
+                // Find all elements containing the day name
+                // filtering for those that likely also contain a date or are headers
+                const candidates = Array.from(doc.querySelectorAll('*')).filter(el => {
+                    // Start with leaf nodes or mostly text nodes
+                    return el.children.length < 3 && el.innerText.includes(dayName);
+                });
+
+                // From candidates, find the one that looks like a header (p or strong usually)
+                // And then find its parent container (the column)
+                let column = null;
+                for (const el of candidates) {
+                    // Check if text looks like "DayName, DD.MM.YYYY" or "DayName (DD.MM.YYYY)"
+                    // Or just strict DayName match
+                    if(el.innerText.includes(dayName)) {
+                        // Traverse up to find a container with width: 35% or similar class
+                        let parent = el.parentElement;
+                        while(parent && parent !== doc.body) {
+                            const style = (parent.getAttribute('style') || '').toLowerCase();
+                            // The snippet uses "width: 35%" or "flex: 1"
+                            if(style.includes('width: 35%') || style.includes('width:35%') || style.includes('flex: 1') || style.includes('flex:1')) {
+                                column = parent;
+                                // Double check: Ensure this column doesn't belong to another day keyword appearing earlier
+                                // (Unlikely given separate columns)
+                                break;
+                            }
+                            parent = parent.parentElement;
+                        }
+                    }
+                    if(column) break;
+                }
+
+                if (!column) return; // No column found for this day
+
+                // Now extract events from this column
+                const eventDivs = Array.from(column.children).filter(child => {
+                    const style = (child.getAttribute('style') || '').toLowerCase();
+                    // Events usually have background-color AND border-radius
+                    // And usually border-left (but could be highlight background)
+                    // Exclude the header (which is usually a <p>)
+                    if(child.tagName === 'P') return false; 
+                    if(child.innerText.includes('keine Events')) return false;
+                    
+                    // Specific check based on user snippet:
+                    // <div style="... background-color: #252525 ..."> or similar
+                    return style.includes('background-color') && style.includes('border-radius');
+                });
+
+                eventDivs.forEach(div => {
+                    // Default values
+                    let title = "Event";
+                    let img = "";
+                    let info = "";
+                    let host = "";
+                    let loc = "";
+                    let time = "";
+                    let price = "";
+                    let highlight = false;
+                    let color = '#c92b2b';
+
+                    // 1. Analyze Style for Highlight
+                    const style = (div.getAttribute('style') || '').toLowerCase();
+                    if(style.includes('border-left')) {
+                         // Highligth check: if border color is distinct or background is reddish
+                         const borderColorMatch = style.match(/border-left:\s*4px\s*solid\s*(#[0-9a-f]{3,6}|rgb\([^)]+\))/i);
+                         if(borderColorMatch) {
+                             const c = borderColorMatch[1].toLowerCase();
+                             if(c !== '#444' && c !== '#444444' && !c.includes('68, 68, 68')) {
+                                 highlight = true;
+                                 // Try to use the color found
+                                 // Clean up hex
+                                 if(c.startsWith('#')) color = c;
+                             }
+                         }
+                    }
+
+                    // 2. Title
+                    // Provide robust search for title div
+                    const potentialTitle = div.querySelector('div[style*="font-weight:bold"], div[style*="font-size:1.1em"]');
+                    if(potentialTitle) {
+                        title = clean(potentialTitle.textContent);
+                    } else {
+                        // Fallback: the first non-empty div or element could be title
+                        // Or look for text before "Veranstalter"
+                    }
+
+                    // 3. Details (Parsing text content by splitting)
+                    // The snippet is unstructured text separated by <br> usually
+                    const fullText = div.innerText; // "Title\nVeranstalter: XYZ\nOrt: ABC..."
+                    
+                    const extractVal = (key) => {
+                        if(!fullText.includes(key)) return '';
+                        const parts = fullText.split(key);
+                        if(parts.length < 2) return '';
+                        // Take the part after key, split by newline to get just the value
+                        let val = parts[1].split('\n')[0];
+                        return clean(val);
+                    }
+
+                    host = extractVal('Veranstalter:');
+                    loc = extractVal('Ort:');
+                    time = extractVal('Uhrzeit:');
+                    price = extractVal('Eintritt:');
+
+                    // 4. Image
+                    const imgTag = div.querySelector('img');
+                    if(imgTag) img = imgTag.src;
+
+                    // 5. Info
+                    // Usually italic
+                    const infoTag = div.querySelector('div[style*="font-style:italic"]');
+                    if(infoTag) info = clean(infoTag.textContent);
+
+                    events[index].push({
+                        title, img, info, host, loc, time, price, highlight, color
+                    });
+                });
+            });
+
+            renderDays();
+            updatePreview();
+            showNotification("Kalender erfolgreich importiert!", "success");
+        }
+
+        function showNotification(msg, type='info') {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.className = 'notification show ' + type;
+            
+            setTimeout(() => {
+                toast.className = 'notification';
+            }, 3000);
         }
 
         init();

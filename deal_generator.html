@@ -139,9 +139,35 @@
         /* Helpers */
         .flex-row { display: flex; gap: 10px; }
         .flex-1 { flex: 1; }
+
+        /* Notification */
+        .notification {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            background-color: #222;
+            color: #fff;
+            padding: 15px 25px;
+            border-radius: 6px;
+            border-left: 5px solid #c92b2b;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        .notification.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        .notification.success { border-left-color: #2ecc71; }
+        .notification.error { border-left-color: #e74c3c; }
     </style>
 </head>
 <body>
+
+    <div id="toast" class="notification">Benachrichtigung</div>
 
     <header style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
         <h1>Deal der Woche Generator</h1>
@@ -151,6 +177,13 @@
     <div class="main-layout">
         <div class="editor-panel">
             
+            <div class="section-title">Importieren</div>
+            <div class="form-group">
+                <label>Vorhandenen Code hier einfügen:</label>
+                <textarea id="importCodeInput" placeholder="<div style=...>...</div>" style="height:100px;"></textarea>
+                <button class="btn btn-secondary" onclick="importCode()">Daten laden</button>
+            </div>
+
             <div class="section-title">Highlight Deal</div>
             <div class="form-group">
                 <label>Unternehmen</label>
@@ -396,6 +429,145 @@
             const copyText = document.getElementById("outputCode");
             copyText.select();
             document.execCommand("copy");
+        }
+
+        function importCode() {
+            const code = document.getElementById('importCodeInput').value;
+            if (!code) return;
+
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(code, 'text/html');
+
+            // --- 1. HIGHLIGHT DEAL ---
+            
+            // Heuristic strategies to find the Highlight Container
+            let hlContainer = null;
+            
+            // Strategy A: By specific style signature (reddish border container)
+            const allDivs = Array.from(doc.querySelectorAll('div'));
+            hlContainer = allDivs.find(d => {
+                const s = (d.getAttribute('style') || '').toLowerCase();
+                // Check for border color (rgba(179,0,0...) or just border and box-shadow combined
+                return (s.includes('border') && s.includes('box-shadow') && s.includes('border-radius:12px'));
+            });
+
+            // Strategy B: Look for content that is unique to highlight (e.g. "Deal der Woche" is header, but inside container?)
+            // The container usually has a child with very large font (Company Name)
+            if(!hlContainer) {
+                hlContainer = allDivs.find(d => {
+                     // Check if it has a child with font-size > 1.5em and text alignment center
+                     const bigText = d.querySelector('div[style*="font-size"]');
+                     const s = bigText ? (bigText.getAttribute('style')||'') : '';
+                     return s.includes('1.6') || s.includes('1.5');
+                });
+            }
+
+            if(hlContainer) {
+                // Company Name (Largest Text)
+                const compEl = Array.from(hlContainer.querySelectorAll('div')).find(d => {
+                    const s = (d.getAttribute('style')||'');
+                    return s.includes('1.6') || (d.textContent.length < 50 && s.includes('bold'));
+                });
+                if(compEl) document.getElementById('hlCompany').value = compEl.textContent.trim();
+
+                // Title (Second Largest Text)
+                // Often inside a nested box
+                const titleEl = Array.from(hlContainer.querySelectorAll('div')).find(d => {
+                    const s = (d.getAttribute('style')||'');
+                    // Font 1.4em
+                    return s.includes('1.4') || (s.includes('color:#ffd7d7') && s.includes('font-weight:700'));
+                });
+                if(titleEl) document.getElementById('hlTitle').value = titleEl.textContent.trim();
+
+                // Image
+                const imgEl = hlContainer.querySelector('img');
+                if(imgEl) document.getElementById('hlImg').value = imgEl.src;
+
+                // Intro Text (Bold, 1.1em or just bold followed by image)
+                // We exclude the title and company name
+                const introEl = Array.from(hlContainer.querySelectorAll('div')).find(d => {
+                    const s = (d.getAttribute('style')||'');
+                    return (s.includes('1.1em') || s.includes('font-weight: bold')) 
+                           && d !== compEl && d !== titleEl && !s.includes('dashed'); // exclude footer
+                });
+                if(introEl) document.getElementById('hlIntro').value = introEl.innerHTML.replace(/<br\s*\/?>/gi, '\n').trim();
+
+                // Description
+                // Look for text with color #ccc or #cccccc
+                const descEl = Array.from(hlContainer.querySelectorAll('div')).find(d => {
+                     const s = (d.getAttribute('style')||'').toLowerCase();
+                     return s.includes('#ccc') && !s.includes('1.5') && !s.includes('0.95'); // distinct from offer desc (0.95)
+                });
+                if(descEl) document.getElementById('hlDesc').value = descEl.innerHTML.replace(/<br\s*\/?>/gi, '\n').trim();
+
+
+                // Footer (Dashed border top)
+                const footerEl = Array.from(hlContainer.querySelectorAll('div')).find(d => (d.getAttribute('style')||'').includes('dashed'));
+                if(footerEl) document.getElementById('hlFooter').value = footerEl.textContent.trim();
+            }
+
+
+            // --- 2. COMPANIES LIST ---
+            companies.length = 0;
+
+            // Find Company Containers
+            // They have a header with a red left border (border-left:4px solid #c92b2b)
+            // The container wraps this header and the offers.
+            
+            // Find all headers first
+            const headers = Array.from(doc.querySelectorAll('div')).filter(d => 
+                (d.getAttribute('style')||'').includes('border-left:4px solid') || 
+                (d.getAttribute('style')||'').includes('border-left: 4px solid')
+            );
+            
+            headers.forEach(header => {
+                const container = header.parentNode; // The wrapper div
+                if(!container) return;
+
+                const compName = header.textContent.trim();
+                
+                // Find offers within this container
+                // Offers are usually flex items with min-width
+                const offerDivs = Array.from(container.querySelectorAll('div')).filter(d => {
+                    const s = (d.getAttribute('style')||'');
+                    return (s.includes('flex:1') || s.includes('flex: 1')) 
+                           && s.includes('border') && s.includes('background');
+                });
+
+                const newComp = { name: compName, offers: [] };
+
+                offerDivs.forEach(oDiv => {
+                    // Title (Bold, 1.125em or just bold border-bottom)
+                    const tEl = Array.from(oDiv.querySelectorAll('div')).find(d => (d.getAttribute('style')||'').includes('font-weight:700'));
+                    const title = tEl ? tEl.textContent.trim() : 'Angebot';
+
+                    // Image
+                    const iEl = oDiv.querySelector('img');
+                    const img = iEl ? iEl.src : '';
+
+                    // Desc
+                    const dEl = Array.from(oDiv.querySelectorAll('div')).find(d => (d.getAttribute('style')||'').includes('#ccc'));
+                    const desc = dEl ? dEl.innerHTML.replace(/<br\s*\/?>/gi, '\n').trim() : '';
+                    
+                    newComp.offers.push({ title, img, desc });
+                });
+
+                companies.push(newComp);
+            });
+
+            renderEditor();
+            updatePreview();
+            showNotification("Daten wurden erfolgreich importiert!", "success");
+        }
+
+        function showNotification(msg, type='info') {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.className = 'notification show ' + type;
+            
+            setTimeout(() => {
+                toast.className = 'notification';
+            }, 3000);
         }
 
         // Init
